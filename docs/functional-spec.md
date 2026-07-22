@@ -8,9 +8,9 @@
 > holds the constraint and this doc holds the behavior — they must agree; if they
 > don't, that's drift to reconcile, not a license to pick one.
 >
-> Items marked **[default]** are PM-proposed defaults the Senior Architect has not
-> explicitly ruled on — flag any that are wrong. Everything else is decided
-> (2026-07-22 unless noted). Genuinely open forks live in § 9.
+> **All v1 behavior below is decided** — Senior Architect pass completed
+> 2026-07-22 (see § 9 Decision record). Changes from here are new decisions, not
+> open questions.
 
 ## 1. Product overview
 
@@ -40,8 +40,9 @@ v1 is reactive-only, but nothing may preclude a later preventive/scheduled origi
 ## 2. Roles & permissions
 
 Authorization is enforced server-side per endpoint (DEC-005); the renderer only
-shows/hides UI for UX. The matrix below is the behavioral contract every
-endpoint's role check implements.
+shows/hides UI for UX. **Planner is a strict superset of User (FS-Q3):** every
+User capability is also a Planner capability. The matrix below is the behavioral
+contract every endpoint's role check implements.
 
 | Capability | User | Planner |
 |---|---|---|
@@ -49,30 +50,34 @@ endpoint's role check implements.
 | Browse assets, asset detail (status, downtime + WO history) | ✓ | ✓ |
 | Register a manual asset | ✓ | ✓ |
 | Report a downtime event (asset down) | ✓ | ✓ |
-| End a downtime event (asset back up) — manual events | ✓ | ✓ **[default]** |
+| End a downtime event (asset back up) — manual events | ✓ | ✓ |
 | Create a work order directly (origin `manual`) | ✓ | ✓ |
 | View all work orders | ✓ | ✓ |
 | Plan / schedule / assign a work order | ✗ | ✓ |
-| Start work on an **Open** (unplanned) WO — self-serve | ✓ | see FS-Q3 |
-| Start work on a **Planned** WO | ✓ (assignee) **[default]** | see FS-Q3 |
-| Complete a WO (with completion notes) | ✓ (executor) | see FS-Q3 |
-| Cancel a WO | ✗ **[default]** | ✓ |
-| Edit WO description/details before work starts | creator **[default]** | ✓ |
+| Start work on an **Open** (unplanned) WO — self-serve | ✓ | ✓ |
+| Start work on a **Planned** WO | assignee only | assignee only |
+| Complete a WO (completion notes required) | executor | executor |
+| Abandon an In Progress WO (moves back, note required) | executor | ✓ |
+| Cancel a WO | ✗ | ✓ |
+| Edit WO description/details before work starts | creator | ✓ |
 
 Decided explicitly: planning/scheduling is Planner-gated but is **not** a gate on
-execution — a User can pick up any Open WO and start it (the 3am-breakdown case).
+execution — anyone can pick up any Open WO and start it (the 3am-breakdown case).
 
 ## 3. Assets & the registry
 
 - An **asset** is a generic, configurable entity — never a plant-specific
   equipment table. **Asset identity is its UNS-style path** (e.g.
   `site/area/line/cell/asset`), for every asset regardless of how it was
-  registered. One namespace.
+  registered. One namespace. The path is immutable.
 - Each asset has a typed **provenance**: `uns_discovered` or `manual`.
   - `uns_discovered`: the UNS is authoritative; the local registry row is a cache
-    rebuilt from UNS discovery (DEC-007).
+    rebuilt from UNS discovery (DEC-007). Not locally editable.
   - `manual`: registered from the front end by a User or Planner; the registry is
-    authoritative (DEC-008).
+    authoritative (DEC-008). Registration captures path, display name, and
+    description; display name and description stay editable (FS-Q7).
+- **No deletes — retire instead (FS-Q7):** retiring a manual asset hides it from
+  the browser but keeps it and all attached history reachable.
 - **Merge rule (DEC-008):** if UNS discovery later finds an asset at the same
   path as a manual asset, they are the same asset — provenance flips to
   `uns_discovered` and all attached history (downtime events, work orders) stays,
@@ -81,8 +86,6 @@ execution — a User can pick up any Open WO and start it (the 3am-breakdown cas
   durations, and work-order history. Status and duration are always **derived
   from the timestamped event log**, never stored as totals (architecture-facts
   § Derived vs. authoritative).
-- Manual registration captures: path, display name, and free-form
-  description/metadata **[default — exact fields land in `data-model.md`]**.
 
 ## 4. Downtime events
 
@@ -90,15 +93,19 @@ execution — a User can pick up any Open WO and start it (the 3am-breakdown cas
   at t₂ (t₂ absent while ongoing). Duration is computed, never stored.
 - **Producers:** UNS-detected (backend MQTT client observes the down signal) or
   front-end-reported (either role, from the asset's detail view).
+- **One ongoing event per asset (FS-Q1):** while an asset has an ongoing downtime
+  event, any second down-report — from either producer — is rejected with a
+  pointer to the ongoing event and its work order.
 - **Seeding:** every downtime event seeds **one** work order automatically at the
   moment the down transition is recorded, with origin `uns_downtime` or
-  `manual_downtime` matching the producer, linked to the event. **[default —
-  duplicate/overlap policy is FS-Q1/FS-Q2]**
+  `manual_downtime` matching the producer, linked to the event. This holds even
+  when a prior WO on the same asset is still open — recurrence stays visible in
+  the queue; smarter linking is post-MVP (FS-Q2).
 - **Ending:** UNS-detected events end when the UNS up-signal arrives;
-  front-end-reported events end when a person marks the asset back up.
-  Completing the work order does **not** auto-end the downtime, and ending the
-  downtime does not auto-complete the WO — the event log records what the asset
-  did; the WO records what people did. **[default]**
+  front-end-reported events end when a person (either role) marks the asset back
+  up. Completing the work order does **not** auto-end the downtime, and ending
+  the downtime does not auto-complete the WO — the event log records what the
+  asset did; the WO records what people did.
 
 ## 5. Work orders
 
@@ -106,40 +113,49 @@ execution — a User can pick up any Open WO and start it (the 3am-breakdown cas
 (required, any provenance) · origin (`uns_downtime` | `manual_downtime` |
 `manual`; typed, extensible) · linked downtime event (present for the two
 downtime origins, absent for `manual`) · title + description · priority
-(`low`/`medium`/`high` **[default — FS-Q6]**) · `created_by` (the actual person,
-or system for UNS-seeded) · `assigned_to` · scheduled window · status ·
-completion notes · timestamps per transition.
+(`low`/`medium`/`high`, default `medium` — settable at creation by either role,
+adjustable by Planners; FS-Q6) · `created_by` (the actual person, or system for
+UNS-seeded) · `assigned_to` · scheduled window · status · completion notes ·
+timestamps per transition.
 
 **State machine (decided):**
 
 ```
 Open → Planned → In Progress → Completed
-  └──────────────────────→ Cancelled (from any non-terminal state)
+  ↑───────↑──────────┘  (abandon: moves back, note required)
+  └──────────────────────→ Cancelled (from any non-terminal state, Planner only)
 ```
 
 | Transition | Who |
 |---|---|
 | (seed/create) → Open | system (event pipeline) or either role (manual) |
 | Open → Planned | Planner (assign + schedule) |
-| Open → In Progress | any User, self-serve |
-| Planned → In Progress | assigned User **[default]** |
-| In Progress → Completed | the executing User, completion notes required **[default: notes required]** |
-| any non-terminal → Cancelled | Planner **[default]** |
+| Open → In Progress | any User or Planner, self-serve |
+| Planned → In Progress | the assignee |
+| In Progress → Completed | the executor; completion notes required |
+| In Progress → Planned (if it was assigned) / Open | executor or Planner; note required (abandon — work returns to the queue, it doesn't die; FS-Q4) |
+| any non-terminal → Cancelled | Planner only (FS-Q4) |
 
 - **Open** = seeded/created, unplanned. **Planned** = a Planner has assigned a
   User and/or set a scheduled window. **In Progress** = someone is executing.
   **Completed/Cancelled** = terminal.
 - Skipping Planned is normal, not an exception path — reactive work often goes
   Open → In Progress directly.
+- **UNS publishing (FS-Q8 — in scope for v1):** work-order lifecycle transitions
+  are published to a **CMMess-owned UNS topic branch** by the backend (which
+  remains the system's sole MQTT client, DEC-007). Publishing is fire-and-forget
+  state reflection — CMMess never consumes its own published topics, and a
+  missing broker degrades publishing silently, never blocking the WO lifecycle
+  (zero-UNS operation stays intact). Topic design lands in `docs/uns-contract.md`.
 
 ## 6. Planning & scheduling (Planner)
 
 - The Planner's working view is the queue of **Open** work orders (filter/sort by
   priority, asset, age).
 - Planning an order = assigning a User, setting a scheduled window (start
-  datetime + expected duration **[default]**), and adjusting priority.
+  datetime + expected duration), and adjusting priority.
 - MVP scheduling is **fields on the work order + list views** — no calendar or
-  capacity visualization in v1 **[default — cut, revisit post-MVP]**.
+  capacity visualization in v1.
 
 ## 7. MVP screen inventory
 
@@ -147,17 +163,18 @@ What exists, not how it looks — `docs/design-guide.md` governs visuals.
 
 1. **Login** — role comes from the account, not a picker.
 2. **Asset browser** — the registry as a UNS-path hierarchy; up/down status at a
-   glance; entry point for manual asset registration.
+   glance; entry point for manual asset registration; retired assets hidden.
 3. **Asset detail** — status, downtime history (derived durations), WO history;
-   actions: report downtime / mark back up / create WO.
+   actions: report downtime / mark back up / create WO / edit-retire (manual
+   assets only).
 4. **Work-order list** — all WOs, filterable by status/assignee/asset/origin;
    "my work" filter for Users.
 5. **Work-order detail** — full record + the role-legal state transitions as
    actions; Planner sees assign/schedule controls here.
 6. **Work-order create** — direct manual creation (asset, title, description,
    priority).
-7. **Planner queue** — Open WOs awaiting planning (may be the WO list with a
-   canned filter rather than a separate screen **[default]**).
+7. **Planner queue** — a canned filter on the WO list (Open, sorted for
+   planning), not a separate screen.
 
 ## 8. Out of scope for v1
 
@@ -172,35 +189,26 @@ Recorded so their absence reads as decided, not forgotten:
 - Parts/inventory management.
 - Attachments/photos on work orders.
 - Multi-site/multi-tenant separation — one shared instance.
-- Publishing to the UNS — v1 the backend only subscribes **[default — FS-Q8]**.
 - Calendar/capacity scheduling views (see § 6).
-- User-administration UI (see FS-Q5 for MVP account provisioning).
+- User-administration UI — accounts are **seeded from backend config** (FS-Q5):
+  username, password hash, role; loaded at startup; no self-signup. Adding a
+  teammate = edit config, restart.
+- Cross-WO downtime linking/dedup beyond the one-ongoing-event rule (FS-Q1/Q2).
 
-## 9. Open product questions
+## 9. Decision record — Architect pass, 2026-07-22
 
-Each has a proposed default so work isn't blocked; the Architect's answer
-supersedes.
+The open questions this spec shipped with, and the rulings now baked into the
+sections above:
 
-- **FS-Q1 — Duplicate downtime, two producers.** Asset is already down via a UNS
-  event and a person also reports it (or vice versa). *Default:* while an asset
-  has an ongoing downtime event, a second down-report on it is rejected with a
-  pointer to the ongoing event — one ongoing event per asset.
-- **FS-Q2 — Repeat downtime while a prior WO is still open.** Asset cycles
-  down→up→down with the first WO unresolved. *Default:* each event seeds its own
-  WO (the log stays honest); smarter linking/dedup is post-MVP.
-- **FS-Q3 — Can Planners execute?** Arch-facts says "Users execute." *Default:*
-  Planner role includes User capabilities (a superset) — a Planner can start and
-  complete work. If roles should be disjoint, say so.
-- **FS-Q4 — Cancel authority.** *Default:* Planner-only (a User abandoning work
-  moves it back rather than killing it — exact "abandon" behavior TBD with the
-  answer here).
-- **FS-Q5 — Account provisioning for MVP.** No admin UI in v1 — how do accounts
-  exist? *Default:* seeded/config-file accounts (name, password hash, role) at
-  backend startup; no self-signup.
-- **FS-Q6 — Priority.** *Default:* keep, three-level enum, default `medium`.
-- **FS-Q7 — Manual asset editing/retiring.** Can a manual asset be edited or
-  removed after registration, especially once WOs hang off it? *Default:* edit
-  display name/description freely; no deletes — retire (hide from browser, keep
-  history).
-- **FS-Q8 — UNS publishing.** Should CMMess ever publish (e.g., WO status back
-  into the namespace)? *Default:* not in v1; subscribe-only.
+- **FS-Q1** One ongoing downtime event per asset; second down-reports rejected → § 4
+- **FS-Q2** Each downtime event seeds its own WO, even with a prior WO open → § 4
+- **FS-Q3** Planner is a strict superset of User → § 2
+- **FS-Q4** Cancel is Planner-only; executors abandon (move back + note) → §§ 2, 5
+- **FS-Q5** Seeded config accounts; no admin UI or self-signup in v1 → § 8
+- **FS-Q6** Priority: low/medium/high, default medium → § 5
+- **FS-Q7** Manual assets: edit name/description, immutable path, retire-not-delete → § 3
+- **FS-Q8** **v1 publishes WO lifecycle state to a CMMess-owned UNS topic branch** (Architect override of the subscribe-only default) → § 5
+- Nine minor defaults accepted wholesale (manual-downtime ending, assignee-start,
+  required completion notes, pre-start editability, registration fields,
+  event/WO independence, window shape, queue-as-filter, no calendar) → in place
+  throughout.

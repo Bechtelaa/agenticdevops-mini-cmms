@@ -28,10 +28,12 @@ Then read what's relevant per the Tier-1/Tier-2 list in the project instructions
 
 **T-002 shipped, merged, fully closed (2026-07-22).** Renderer shell (Electron+Vite+React, main lifecycle-only, ctx isolation on) + `ci.yml` merged to `main` via PR #1 (squash `84761ff`); branch deleted local+remote. First complete branch→PR→CI-green→merge trip. The full loop ran with two real arbitrations: Cursor's doc-allowlist FAIL (PM branch bookkeeping, not agent drift — future ACs now say "the *coding agent* changes no files outside this list") and a first-run CI failure that produced **TRAP-001** (npm-major skew: lock written by npm 11, rejected by npm 10; fixed by repinning CI Node 22→26 to match the lead's machine and regenerating the lock from scratch — plain `npm install` was a no-op on the bad lock). Full record: `docs/completed_development.md` § T-002.
 
+**FS settled (2026-07-22).** The Architect's pass on `docs/functional-spec.md` is complete: FS-Q1–Q8 ruled, all [default] markers accepted, decisions baked into the doc (§ 9 is the decision record). Headline rulings: one ongoing downtime event per asset; each event seeds its own WO; Planner ⊇ User; cancel Planner-only with an executor abandon path; seeded config accounts; 3-level priority; retire-not-delete assets; and **FS-Q8 override — v1 publishes WO lifecycle state to a CMMess-owned UNS topic branch** (backend stays sole MQTT client; fire-and-forget, never blocks the WO lifecycle; expands `docs/uns-contract.md` scope to a publish surface when authored).
+
 ## Immediate next steps
 
-1. Human: pass over `docs/functional-spec.md` — rule on the **[default]** markers and FS-Q1–Q8. This is the frontier now.
-2. PM: spec the first feature slices cut from the FS — recommended order: **T-003 data model + persistence base** (SQLAlchemy/Alembic dual-engine; authors `docs/data-model.md`), then **T-004 auth/roles** (server-side enforcement per DEC-005).
+1. PM: spec **T-003 — data model + persistence base** (SQLAlchemy/Alembic dual-engine; asset/downtime-event/WO schema per the settled FS; authors `docs/data-model.md`).
+2. Then **T-004 — auth/roles** (seeded config accounts per FS-Q5; server-side enforcement per DEC-005).
 
 ## Architecture authorities by area (read the one you're touching)
 
