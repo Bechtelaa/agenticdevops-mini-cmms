@@ -2,8 +2,18 @@
 
 > The authority for the renderer↔backend REST surface. Per `docs/contract-sync.md`,
 > any endpoint/schema change moves its Pydantic model, its TypeScript type, and this
-> doc **in the same commit** (Rule 12). No renderer exists yet, so the TypeScript leg
-> is N/A until the renderer lands.
+> doc **in the same commit** (Rule 12). The TypeScript leg lives in
+> `src/api/types.ts` (T-008); the renderer calls exclusively through
+> `src/api/client.ts` — no hand-rolled fetches.
+
+## CORS
+
+The renderer (Vite dev server) calls the backend cross-origin. Allowed
+origins come from `CMMESS_CORS_ORIGINS` (comma-separated), defaulting to the
+Vite dev origins `http://localhost:5173,http://127.0.0.1:5173`.
+`allow_credentials` is **false** — auth is the bearer header, no cookies.
+Packaged-app (`file://`) origin handling is the packaging task's problem —
+noted, not solved here.
 
 ## Auth
 
@@ -30,8 +40,8 @@ FS-Q3: Planner ⊇ User — a planner session passes both.
 Accounts are seeded from a TOML config at startup (FS-Q5) — see
 `docs/data-model.md`; there is no signup/registration endpoint.
 
-TypeScript leg: N/A this task (backend-only, Architect 2026-07-22); the
-renderer login task adds the TS types for these shapes.
+TypeScript leg: `UserOut`, `LoginRequest`, `LoginResponse` in
+`src/api/types.ts`.
 
 ### POST /auth/login
 
@@ -88,7 +98,8 @@ one namespace: registering a duplicate path returns **409**.
 - `WorkOrderSummaryOut` — `id`, `origin`, `title`, `priority`, `status`,
   `created_at` (summary only — T-007 owns the full WO surface)
 
-TypeScript leg: N/A until the renderer client lands (T-008).
+TypeScript leg: `AssetOut`, `AssetDetailOut`, `DowntimeEventOut`,
+`WorkOrderSummaryOut`, `AssetCreate`, `AssetUpdate` in `src/api/types.ts`.
 
 ### GET /assets
 
@@ -152,7 +163,8 @@ Response shapes reuse the Assets section's `DowntimeEventOut` and
 **Explicit independence (FS §4):** ending a downtime event never changes its
 work order's status, and no work-order code path ends events.
 
-TypeScript leg: N/A until T-008.
+TypeScript leg: `DowntimeReportOut`, `OngoingDowntimeDetail` in
+`src/api/types.ts`.
 
 ### POST /assets/{asset_id}/downtime-events
 
@@ -175,7 +187,9 @@ TypeScript leg: N/A until T-008.
 
     `work_order_id` is null only in the theoretical case no WO row links to
     the ongoing event. The same body is returned on the insert race (the
-    partial unique index is the backstop) — never a 500.
+    partial unique index is the backstop) — never a 500. TS:
+    `OngoingDowntimeDetail` (+ `isOngoingDowntimeDetail` guard) in
+    `src/api/types.ts`.
 
 ### POST /downtime-events/{event_id}/end
 
@@ -223,7 +237,9 @@ its downtime event.
   (chronological)
 
 All transition endpoints return the updated `WorkOrderDetailOut`.
-TypeScript leg: N/A until T-008.
+TypeScript leg: `WorkOrderOut`, `WorkOrderDetailOut`, `TransitionOut`,
+`WorkOrderCreate`, `WorkOrderEdit`, `WorkOrderListFilters`, `PlanBody` in
+`src/api/types.ts`.
 
 ### GET /work-orders
 

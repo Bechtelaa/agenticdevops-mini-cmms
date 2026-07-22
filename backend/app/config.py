@@ -6,8 +6,12 @@ from pathlib import Path
 ENV_DATABASE_URL = "CMMESS_DATABASE_URL"
 ENV_USERS_FILE = "CMMESS_USERS_FILE"
 ENV_SESSION_TTL_HOURS = "CMMESS_SESSION_TTL_HOURS"
+ENV_CORS_ORIGINS = "CMMESS_CORS_ORIGINS"
 
 DEFAULT_SESSION_TTL_HOURS = 24
+# The Vite dev origins. Packaged-app (file://) origin handling is the
+# packaging task's problem — noted, not solved here.
+DEFAULT_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -28,6 +32,12 @@ def get_users_file() -> Path:
 def get_session_ttl_hours() -> int:
     """Session lifetime in hours (``CMMESS_SESSION_TTL_HOURS``, default 24)."""
     return int(os.environ.get(ENV_SESSION_TTL_HOURS, str(DEFAULT_SESSION_TTL_HOURS)))
+
+
+def get_cors_origins() -> list[str]:
+    """Allowed CORS origins (``CMMESS_CORS_ORIGINS``, comma-separated)."""
+    raw = os.environ.get(ENV_CORS_ORIGINS, DEFAULT_CORS_ORIGINS)
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
 def get_database_url() -> str:
