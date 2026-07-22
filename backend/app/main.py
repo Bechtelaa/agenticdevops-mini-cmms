@@ -11,6 +11,7 @@ from app.assets import router as assets_router
 from app.auth import router as auth_router
 from app.downtime import router as downtime_router
 from app.seeding import seed_users_from_config
+from app.work_orders import router as work_orders_router
 
 
 class HealthResponse(BaseModel):
@@ -33,6 +34,7 @@ app = FastAPI(title="CMMess Backend", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(assets_router)
 app.include_router(downtime_router)
+app.include_router(work_orders_router)
 
 
 @app.get("/health", response_model=HealthResponse)

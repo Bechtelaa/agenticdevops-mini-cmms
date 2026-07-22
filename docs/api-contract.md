@@ -189,6 +189,111 @@ TypeScript leg: N/A until T-008.
   - `409` already ended — **not idempotent**, so `ended_by` attribution is
     never silently rewritten
 
+## Work orders
+
+FS §5's state machine over REST (`backend/app/work_orders.py`). Every status
+change goes through one shared transition helper that updates the WO and
+writes its `work_order_transitions` audit row **in the same transaction** —
+the FS-Q8 UNS-publish hook point; no second write path may be added.
+Creation/seeding is not a transition and writes no row.
+
+**Executor rule:** there is no executor column — starting a WO sets
+`assigned_to` to the starter, so while `in_progress` the executor *is*
+`assigned_to`. Abandon back to `open` clears the assignment; back to
+`planned` keeps it.
+
+**Error semantics:** wrong person/role → `403`; wrong state → `409` whose
+`detail` names the current status (e.g. `cannot start a work order in status
+'completed'`); unknown id → `404`. Uniform 401s per the Auth section.
+
+**Explicit independence (FS §4):** completing or cancelling a WO never ends
+its downtime event.
+
+**Models:**
+
+- `WorkOrderOut` — `id`, `asset_id`, `origin`, `downtime_event_id: int | null`,
+  `title`, `description: str | null`, `priority`, `status`,
+  `created_by: int | null`, `assigned_to: int | null`,
+  `scheduled_start: datetime | null`, `expected_duration_minutes: int | null`,
+  `completion_notes: str | null`, `created_at`, `updated_at`
+- `TransitionOut` — `from_status`, `to_status`, `at`, `by_user: int | null`,
+  `note: str | null`
+- `WorkOrderDetailOut` — `WorkOrderOut` + `downtime_event: DowntimeEventOut |
+  null` (reused from Assets) + `transitions: list[TransitionOut]`
+  (chronological)
+
+All transition endpoints return the updated `WorkOrderDetailOut`.
+TypeScript leg: N/A until T-008.
+
+### GET /work-orders
+
+- **Auth:** bearer (`require_user`)
+- **Query (exact-match, ANDed):** `status`, `asset_id`, `assigned_to`,
+  `origin`, `priority`
+- **Response:** `list[WorkOrderOut]`, `created_at` desc. The Planner queue
+  (FS §6) is `status=open`; "my work" is `assigned_to=<own id>` — canned
+  filters, not endpoints.
+
+### GET /work-orders/{id}
+
+- **Auth:** bearer (`require_user`) → `WorkOrderDetailOut`; `404` unknown
+
+### POST /work-orders
+
+- **Auth:** bearer (`require_user`) — either role
+- **Request:** `WorkOrderCreate` — `asset_id`, `title`,
+  `description: str | null = null`, `priority = "medium"` (FS-Q6: settable at
+  creation by either role)
+- **Response:** `201` + `WorkOrderOut` — origin `manual`, no event, status
+  `open`, `created_by` = current user
+- **Errors:** `404` unknown asset; `409` retired asset
+
+### PATCH /work-orders/{id}
+
+- **Auth:** bearer (`require_user`) — **creator or any Planner**
+- **Request:** `title?`, `description?` (explicit `description: null` clears;
+  unknown fields → `422`). Priority is deliberately absent — post-creation
+  priority changes live in `plan`.
+- Allowed while `open`/`planned` only. **Errors:** `403` wrong person; `409`
+  started/terminal; `404` unknown
+
+### POST /work-orders/{id}/plan — `require_planner`
+
+- **Request (all optional, ≥1 required → else `422`):** `assigned_to?`,
+  `scheduled_start?`, `expected_duration_minutes?`, `priority?`.
+  `assigned_to` must reference an existing **active** user → `422` otherwise.
+- From `open`: sets fields, status → `planned` (audit row). On an
+  already-`planned` WO: **re-plan** — fields update, status unchanged, **no**
+  audit row (rows record status changes only). Any other status → `409`.
+
+### POST /work-orders/{id}/start — `require_user`
+
+- From `open`: anyone, self-serve (the 3am case) — sets `assigned_to` =
+  starter. From `planned`: **assignee only** (`403` for anyone else,
+  Planners included). Status → `in_progress`. Other states → `409`.
+
+### POST /work-orders/{id}/complete — `require_user`
+
+- **Request:** `completion_notes` — required, non-empty after strip (`422`)
+- From `in_progress` only (`409` otherwise); **executor only**
+  (`assigned_to` == caller; `403` otherwise, Planners included). Status →
+  `completed`; notes stored on the WO.
+
+### POST /work-orders/{id}/abandon — `require_user`
+
+- **Request:** `note` — required, non-empty (`422`); the note lands on the
+  transition row
+- From `in_progress` only (`409`); **executor or any Planner** (FS-Q4;
+  `403` otherwise). Target state: the `from_status` of the latest transition
+  into `in_progress` — back to `planned` keeps `assigned_to`, back to `open`
+  clears it. The WO is startable again.
+
+### POST /work-orders/{id}/cancel — `require_planner`
+
+- **Request:** `note?` (optional)
+- From any non-terminal status → `cancelled`; terminal → `409`; `user` role →
+  `403` (FS-Q4)
+
 ## Endpoints
 
 ### GET /health
