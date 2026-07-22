@@ -38,10 +38,12 @@ Then read what's relevant per the Tier-1/Tier-2 list in the project instructions
 
 **T-004 shipped, verified live, closed out (2026-07-22).** Auth is real on `main` (commit `04941a4`): seeded TOML accounts with revocation semantics, opaque sessions (SHA-256 at rest), and `require_user`/`require_planner` as the binding DEC-005 pattern (Planner ⊇ User) — recorded in `docs/api-contract.md` § Auth. Runtime-verified against the human's live `uvicorn` + dev DB (login/me/logout, identical no-enumeration 401s, revocation on logout). The dev DB is now migrated to head `0002` and the human's real `backend/config/users.toml` exists (gitignored, example passwords — **replace before any non-toy use**). Full record: `docs/completed_development.md` § T-004. Note: `docs/dev-history-temp.md` is an untracked temp file of the human's — leave uncommitted; delete on request.
 
+**T-004 CI green on `main` (2026-07-22).** **Ordering decided (Architect): backend domain endpoints before the renderer login.** Planned backend slices, in order: **T-005 Assets API** (registry list/browse/detail with derived up-down status, manual register/edit/retire — FS §3) → **T-006 Downtime events + WO seeding** (report down / mark up, FS-Q1 service-level rejection, the event→WO seeding core — FS §4) → **T-007 Work-order API** (list/filter/detail/create, state machine with role-gated transitions + audit rows + abandon, planning — FS §§5–6). Renderer login + typed API client follows, against a stable API. UNS ingestion/publishing and packaging remain after that.
+
 ## Immediate next steps
 
-1. PM: push `main`; watch CI (post-hoc, main-only session).
-2. Architect's ordering call for the next slice: **T-005 renderer login + typed API client** (first TS leg of Rule 12, first design-guide-bound UI) vs. **backend domain endpoints first** (assets/downtime/WO on the T-003 schema behind the T-004 gates).
+1. PM: spec **T-005 — Assets API** (authority: `functional-spec.md` §3, `data-model.md`, `api-contract.md`; the `require_user`/`require_planner` gates are binding).
+2. Loop as established: Dev on `main` → Cursor QA → PM read-verify → human/PM runtime test → close-out → push → watch CI.
 
 ## Architecture authorities by area (read the one you're touching)
 
