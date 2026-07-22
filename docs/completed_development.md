@@ -16,6 +16,22 @@ The one line worth repeating because it's mandatory and cheap: every entry carri
 
 ## Log
 
+### T-002 — Renderer scaffold: Electron+Vite+React shell; CI workflow live
+
+**Date:** 2026-07-22
+**Spec:** `docs/tasks/task_T-002_renderer-scaffold-ci.md`
+**Verified by human:** ✅ 2026-07-22 — "All tests passed"; `npm run dev` launched the Electron window with the placeholder. Final criterion (CI green on the actual PR) closes at merge — tracked in the handoff.
+
+**What was built.** The Electron + Vite + TypeScript + React renderer shell at repo root, scaffolded from electron-forge's vite-typescript template: `src/main.ts` is lifecycle-only with `contextIsolation: true` / `nodeIntegration: false` explicit (DEC-004 + security baseline; no IPC, HTTP, or domain logic — confirmed by PM read of every `src/` file), a comment-only preload, and a static placeholder `App`. Test harness established: vitest + jsdom + Testing Library, one test rendering `App` and asserting by role + text, with `vitest.config.ts` deliberately separate from the forge/vite build configs. eslint flat config (@eslint/js + typescript-eslint; template's legacy .eslintrc upgraded per spec), strict tsconfig, and scripts `dev|build|lint|test|typecheck` all wired and exiting 0. `.github/workflows/ci.yml` implements `docs/devops_pipeline.md`'s table exactly: push-to-main + PR, `permissions: contents: read`, Python 3.12 + Node 22 pinned, backend ruff/mypy soft via `continue-on-error` with "soft — advisory" step names, all other steps hard, no extras. Cursor QA: all mechanical checks PASS on both toolchains; its two FAILs were arbitrated — doc-allowlist hits were the PM's own branch bookkeeping (agent's blast radius clean), and CI-green is sequenced post-PR by design.
+
+**Files touched.** NEW: `.github/workflows/ci.yml` · `package.json` · `package-lock.json` · `forge.config.ts` · `forge.env.d.ts` · `index.html` · `tsconfig.json` · `eslint.config.mjs` · `vite.main.config.ts` · `vite.preload.config.ts` · `vite.renderer.config.ts` · `vitest.config.ts` · `src/main.ts` · `src/preload.ts` · `src/renderer.tsx` · `src/App.tsx` · `src/App.test.tsx` · `src/index.css` · `src/test/setup.ts`. Modified: `.gitignore` (adds `.vite/` only) · `README.md` (real dev/build commands).
+
+**Deviations from spec.** None in substance. Two recorded interpretations: `npm run build` = `tsc --noEmit && electron-forge package` (heavier than a bare bundle; satisfies the criterion, `out/` gitignored) · `@vitejs/plugin-react` pinned `^4` (v6 requires Vite 8; forge template pins Vite 5). Known non-blocking: Vite emits an "empty chunk: preload" warning for the comment-only preload — no lint impact, no silencer needed.
+
+**Architectural impact.** None new — first implementation of the DEC-004 shell (main lifecycle-only) and the Electron security baseline; `docs/devops_pipeline.md` is now current state, not target (its § First green build was rewritten this close-out).
+
+**User-facing impact.** None. No end users yet; `README.md` dev-commands block updated in the same commit.
+
 ### T-001 — Backend skeleton: FastAPI `GET /health`, test, tooling; API contract doc seeded
 
 **Date:** 2026-07-22

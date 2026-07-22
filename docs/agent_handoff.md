@@ -26,10 +26,13 @@ Then read what's relevant per the Tier-1/Tier-2 list in the project instructions
 
 **Functional spec drafted + DEC-008 landed (2026-07-22).** `docs/functional-spec.md` is live as the product-behavior authority (announced in `authority-docs-by-area.md`): three WO origins (`uns_downtime`/`manual_downtime`/`manual` — Architect decision), manual asset registration with provenance + path-merge rule (DEC-008, narrows DEC-007 — the product is fully usable with zero UNS), standard WO state machine (Open→Planned→In Progress→Completed, +Cancelled), User self-serve execution on Open WOs. `architecture-facts.md` and `CLAUDE.md` were synced to DEC-008 in the same pass. **Awaiting the Architect's pass on the FS's [default] markers and § 9 open questions (FS-Q1–Q8)** — defaults are workable, so this doesn't block T-002. The three earlier constitution edits are synced into the Project instructions field (done 2026-07-22). Temp file `docs/architecture-diagram-temp.md` exists for the human to pull out — not a living doc; delete on request (its "UNS authoritative" label predates DEC-008).
 
+**T-002 built, verified, closed out (2026-07-22) — commit/PR/merge pending.** Renderer shell + CI live on branch `T-002-renderer-scaffold-ci` (uncommitted; Claude Code is holding the commit). Full loop ran: Dev → Cursor QA (mechanical all-PASS; two FAILs arbitrated by PM — doc-allowlist hits were PM branch bookkeeping, CI-green is post-PR by design) → PM read-verify of every shipped file → human runtime test (Electron window + placeholder ✅). Close-out landed: completed-dev § T-002, index ✅, devops_pipeline § First-green-build rewritten to current-state. **The one open criterion: CI green on the actual PR** — first real PR→CI→squash-merge trip. Spec-authoring lesson for future ACs: write the blast-radius criterion as "the *coding agent* changes no files outside this list" so PM branch bookkeeping stops tripping QA.
+
 ## Immediate next steps
 
-1. PM: spec T-002 — renderer scaffold + green CI (carries `ci.yml`; branch→PR→merge discipline resumes here).
-2. Human: pass over `docs/functional-spec.md` — rule on the **[default]** markers and FS-Q1–Q8 (async; doesn't block T-002).
+1. Human: have Claude Code commit on `T-002-renderer-scaffold-ci` (close-out doc edits ride the same branch), push, open the PR (body template in `development_workflow.md` §4).
+2. Human + PM: confirm CI green on the PR → squash-merge, delete branch. That closes T-002's last criterion.
+3. Human: pass over `docs/functional-spec.md` — rule on the **[default]** markers and FS-Q1–Q8. This is now the frontier: next specs are feature slices cut from the FS (likely: data model + persistence base, then auth/roles).
 
 ## Architecture authorities by area (read the one you're touching)
 

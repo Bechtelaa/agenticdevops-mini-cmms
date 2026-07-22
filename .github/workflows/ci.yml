@@ -1,0 +1,61 @@
+# CI runbook implementation — authority: docs/devops_pipeline.md.
+# Read-only permissions by design: the pipeline is a checker, not a writer.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Python 3.12)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install — backend
+        run: pip install -r requirements.txt
+
+      - name: Lint — backend (ruff, soft — advisory, does not fail the build)
+        continue-on-error: true
+        run: ruff check .
+
+      - name: Typecheck — backend (mypy, soft — advisory, does not fail the build)
+        continue-on-error: true
+        run: mypy .
+
+      - name: Test — backend
+        run: pytest
+
+  renderer:
+    name: Renderer (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install — renderer
+        run: npm ci
+
+      - name: Typecheck — renderer
+        run: npx tsc --noEmit
+
+      - name: Lint — renderer
+        run: npx eslint .
+
+      - name: Test — renderer
+        run: npx vitest run

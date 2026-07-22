@@ -59,4 +59,4 @@ If tempted to give CI write access "just to auto-fix the generated pages," don't
 
 ## First green build
 
-CI cannot pass until the product is scaffolded — there is no `package.json`, `requirements.txt`, or test yet. Task **T-001 (repo scaffold + green CI)** creates the minimum on both sides (a buildable renderer skeleton, a FastAPI skeleton, and one trivial passing test each) so every step above has something real to run. Until T-001 merges, treat this runbook as the target, not the current state.
+Landed 2026-07-22 across two tasks: **T-001** gave the Python job its checks (FastAPI skeleton, pytest, ruff, mypy); **T-002** landed the Node toolchain (Electron/Vite/React skeleton, tsc, eslint, vitest) and `ci.yml` itself. This runbook is **current state**, implemented exactly as tabled above. Next expected change: promoting backend `ruff` from soft to hard once it has run clean across a few real merged PRs (see the promotion criterion).

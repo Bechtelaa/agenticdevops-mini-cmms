@@ -26,14 +26,18 @@ The renderer talks to the backend over HTTP (localhost) and holds no business lo
 ## Build & run
 
 ```
-# Backend
+# Backend (run from backend/)
+cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 
-# Renderer (Electron + Vite)
+# Renderer (Electron + Vite, repo root)
 npm install
-npm run dev        # develop
-npm run build      # build renderer + main
+npm run dev        # develop (Electron window + Vite HMR)
+npm run build      # typecheck + bundle renderer and main
+npm run test       # vitest (jsdom)
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
 npm run make       # per-OS installers (electron-forge)
 ```
 
